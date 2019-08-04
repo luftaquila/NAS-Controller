@@ -1,0 +1,60 @@
+{
+    "settings": {
+        "key": "YrSxOngAldWqMkTNODWgtb2yM1Xzj0ulzBrEGyQgma2UCYT/9Fg3xB1F4J7P7boyaMBRmcKOGEnEhva22U/uaQ==",
+        "signup": true,
+        "createUserDir": false,
+        "defaults": {
+            "scope": "./shared",
+            "locale": "en",
+            "viewMode": "mosaic",
+            "sorting": {
+                "by": "",
+                "asc": false
+            },
+            "perm": {
+                "admin": false,
+                "execute": true,
+                "create": true,
+                "rename": true,
+                "modify": true,
+                "delete": true,
+                "share": true,
+                "download": true
+            },
+            "commands": []
+        },
+        "authMethod": "json",
+        "branding": {
+            "name": "LUFT-AQUILA",
+            "disableExternal": false,
+            "files": ""
+        },
+        "commands": {
+            "after_copy": [],
+            "after_delete": [],
+            "after_rename": [],
+            "after_save": [],
+            "after_upload": [],
+            "before_copy": [],
+            "before_delete": [],
+            "before_rename": [],
+            "before_save": [],
+            "before_upload": []
+        },
+        "shell": [],
+        "rules": []
+    },
+    "server": {
+        "root": "/home/pi/ExtHDD",
+        "baseURL": "",
+        "socket": "",
+        "tlsKey": "",
+        "tlsCert": "",
+        "port": "80",
+        "address": "192.168.0.3",
+        "log": "log.txt"
+    },
+    "auther": {
+        "recaptcha": null
+    }
+}

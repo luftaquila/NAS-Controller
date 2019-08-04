@@ -1,0 +1,11 @@
+[Unit]
+Description=server controller service
+Wants=network-online.target
+After=network.target network-online.target
+
+[Service]
+Type=simple
+ExecStart=/bin/bash /home/pi/ESP12E/controller.sh
+
+[Install]
+WantedBy=multi-user.target
