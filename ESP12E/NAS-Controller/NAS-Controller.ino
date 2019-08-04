@@ -14,9 +14,9 @@
 
 Adafruit_SSD1306 OLED(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
-const char auth[] = "64vBgqBMh3kK7eEPWFgMblKib7sNwqLk";
-const char ssid[] = "LUFT-AQUILA";
-const char pass[] = "rokaFWIf512#";
+const char auth[] = "YOUR_BLYNK_AUTH_TOKEN";
+const char ssid[] = "YOUR_SSID";
+const char pass[] = "YOUR_AP_PASSWORD";
 
 BlynkTimer timer;
 
