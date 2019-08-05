@@ -133,7 +133,7 @@ void updater() {
     OLED.print("O");
     OLED.display();
   }
-  else if(temp < 50.0 && FAN_STAT && autoFan) {
+  else if(temp < 60.0 && FAN_STAT && autoFan) {
     autoFan = false;
     FAN_STAT = LOW;
     Blynk.virtualWrite(V2, LOW);
@@ -186,6 +186,12 @@ void initOLED() {
   OLED.print("L.IP:");
   OLED.setCursor(0, 42);
   OLED.print("UP:");
+  OLED.setCursor(30, 9);
+  OLED.print(HDD_STAT ? "O" : "X");
+  OLED.setCursor(72, 9);
+  OLED.print(COM_STAT ? "O" : "X");
+  OLED.setCursor(114, 9);
+  OLED.print(FAN_STAT ? "O" : "X");
 }
 
 void updateOLED(float serverVoltage) {
