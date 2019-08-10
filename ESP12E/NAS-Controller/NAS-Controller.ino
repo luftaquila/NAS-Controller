@@ -25,13 +25,12 @@ WidgetLED LED2(V4);
 
 bool status = false;
 bool autoFan = false;
+bool isNew = true;
 
+int isOnline;
 int HDD_STAT = false;
 int COM_STAT = false;
 int FAN_STAT = false;
-
-int isOnline;
-int timeout = 0;
 
 char rcvData[130];
 char cputemp[50] = "00.0";
@@ -74,25 +73,15 @@ BLYNK_WRITE(V0) { // HDD Control
   HDD_STAT = param.asInt();
   OLED.setCursor(30, 9);
   if(HDD_STAT) { digitalWrite(HDD, HIGH); OLED.print("O"); }
-  else if(!COM_STAT) {
-    digitalWrite(HDD, LOW );
-    OLED.print("X");
-  }
-  else Blynk.virtualWrite(V0, HIGH);
+  else         { digitalWrite(HDD, LOW ); OLED.print("X"); }
   OLED.display();
 }
 
 BLYNK_WRITE(V1) { // Main Control
   COM_STAT = param.asInt();
   OLED.setCursor(72, 9);
-  if(COM_STAT) {
-    if(HDD_STAT) {
-      digitalWrite(COM, HIGH);
-      OLED.print("O");
-    }
-    else Blynk.virtualWrite(V1, LOW);
-  }
-  else { digitalWrite(COM, LOW ); OLED.print("X"); }
+  if(COM_STAT) { digitalWrite(COM, HIGH); OLED.print("O"); }
+  else         { digitalWrite(COM, LOW ); OLED.print("X"); }
   OLED.display();
 }
 
@@ -105,14 +94,14 @@ BLYNK_WRITE(V2) { // FAN Control
   OLED.display();
 }
 
-BLYNK_CONNECTED()        { Blynk.syncAll(); }
+BLYNK_CONNECTED() { Blynk.syncAll(); }
 
 void updater() {
   // Voltage Divider : 98.2kΩ, 19.57kΩ   divide ratio : 0.166
   float serverVoltage = svrVolt = float(analogRead(ADC)) / 1023.0 / 0.166;
   float temp = String(cputemp).toFloat();
 
-  if(serverVoltage > 3) LED1.on();  else LED1.off();
+  if(serverVoltage > 4.6) LED1.on();  else LED1.off();
   if(status)            LED2.on();  else LED2.off();
   Blynk.virtualWrite(V5, String(serverVoltage, 3) + "V");
   Blynk.virtualWrite(V6, String(publicIP) + " : " + String(localIP));
@@ -145,19 +134,25 @@ void receiver() {
   if(Serial.available()) {
     if(timer.isEnabled(isOnline)) timer.restartTimer(isOnline);
 
-    status = true;
-    timeout = 0;
     Serial.readStringUntil('|').toCharArray(rcvData, 150);
+    if(isNew) { isNew = !isNew; return; }
 
     byte count = 0;
+    bool isValid = false;
     char *p = strtok(rcvData, "/");
     while(p) {
-      if     (count == 0) strcpy(cputemp,  p);
-      else if(count == 1) strcpy(publicIP, p);
-      else if(count == 2) strcpy(localIP,  p);
-      else if(count == 3) strcpy(upTime,   p);
-      else if(count == 4) strcpy(nowTime,  p);
-
+      if (!count) {
+        if(!strcmp(p, "+")) status = true;
+        else return;
+      }
+      else if(count == 1) strcpy(cputemp,  p);
+      else if(count == 2) strcpy(publicIP, p);
+      else if(count == 3) strcpy(localIP,  p);
+      else if(count == 4) strcpy(upTime,   p);
+      else if(count == 5) {
+        if(strcmp(nowTime, p)) strcpy(nowTime,  p);
+        else serverNotAvailable();
+      }
       p = strtok(NULL, "/");
       count++;
     }
@@ -219,6 +214,7 @@ void rstOLED() {
 }
 
 void serverNotAvailable() {
+  isNew = true;
   status = false;
   strcpy(cputemp,  "N/A   ");
   strcpy(publicIP, "N/A           ");
@@ -226,4 +222,5 @@ void serverNotAvailable() {
   strcpy(upTime,   "N/A                 ");
   strcpy(nowTime,  "SERVER OFF            ");
   OLED.display();
+  while(Serial.available()) Serial.read();
 }
