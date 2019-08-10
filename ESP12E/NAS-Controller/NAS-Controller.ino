@@ -14,16 +14,15 @@
 
 Adafruit_SSD1306 OLED(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
-const char auth[] = "YOUR_BLYNK_AUTH_TOKEN";
+const char auth[] = "YOUR_AUTH_TOKEN";
 const char ssid[] = "YOUR_SSID";
-const char pass[] = "YOUR_AP_PASSWORD";
+const char pass[] = "YOUR_PASSWORD";
 
 BlynkTimer timer;
 
 WidgetLED LED1(V3);
 WidgetLED LED2(V4);
 
-bool client = false;
 bool status = false;
 bool autoFan = false;
 
@@ -35,11 +34,11 @@ int isOnline;
 int timeout = 0;
 
 char rcvData[130];
-char cputemp[5] = "00.0";
-char localIP[20]  = "Starting";
-char publicIP[20] = "Device";
+char cputemp[50] = "00.0";
+char localIP[50]  = "Starting";
+char publicIP[50] = "Device";
 char upTime[50]  = "0sec";
-char nowTime[30] = "1999-05-12 00:00:00.0";
+char nowTime[50] = "1999-05-12 00:00:00.0";
 
 float svrVolt;
 
@@ -107,24 +106,21 @@ BLYNK_WRITE(V2) { // FAN Control
 }
 
 BLYNK_CONNECTED()        { Blynk.syncAll(); }
-BLYNK_APP_CONNECTED()    { client = true;   }
-BLYNK_APP_DISCONNECTED() { client = false;  }
 
 void updater() {
   // Voltage Divider : 98.2kΩ, 19.57kΩ   divide ratio : 0.166
   float serverVoltage = svrVolt = float(analogRead(ADC)) / 1023.0 / 0.166;
-
-  if(client) {
-    if(serverVoltage > 3) LED1.on();  else LED1.off();
-    if(status)            LED2.on();  else LED2.off();
-    Blynk.virtualWrite(V5, String(serverVoltage, 3) + "V");
-    Blynk.virtualWrite(V6, String(publicIP) + " : " + String(localIP));
-    Blynk.virtualWrite(V7, upTime);
-    Blynk.virtualWrite(V8, nowTime);
-    Blynk.virtualWrite(V9, String(cputemp) + "°C");
-  }
   float temp = String(cputemp).toFloat();
-  if(temp > 50.0 && !FAN_STAT) {
+
+  if(serverVoltage > 3) LED1.on();  else LED1.off();
+  if(status)            LED2.on();  else LED2.off();
+  Blynk.virtualWrite(V5, String(serverVoltage, 3) + "V");
+  Blynk.virtualWrite(V6, String(publicIP) + " : " + String(localIP));
+  Blynk.virtualWrite(V7, upTime);
+  Blynk.virtualWrite(V8, nowTime);
+  Blynk.virtualWrite(V9, String(cputemp) + "°C");
+
+  if(temp > 60.0 && !FAN_STAT) {
     autoFan = true;
     FAN_STAT = HIGH;
     Blynk.virtualWrite(V2, HIGH);
