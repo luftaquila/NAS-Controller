@@ -48,7 +48,6 @@ def transmit() : # transmit to ESP
 
 updateCPUTemp()
 updateIP()
-updateLocalIP()
 updateServerUptime()
 updateServerTime()
 #transmit()
