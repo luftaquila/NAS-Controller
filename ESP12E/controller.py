@@ -13,34 +13,30 @@ def updateCPUTemp() : # get CPU Temperature
     blynk.virtual_write(9, cputemp)
 	threading.Timer(3, updateCPUTemp).start()
 
-def updatePublicIP() : # get public IP address
+def updateIP() : # get public / local IP address
 	global publicIP
 	try : publicIP = subprocess.check_output('/usr/bin/dig +short myip.opendns.com @resolver1.opendns.com', shell=True).decode()[:-1]
 	except subprocess.CalledProcessError : publicIP = 'unknown'
 
-    blynk.virtual_write(9, publicIP)
-	threading.Timer(3600, updatePublicIP).start()
-
-def updateLocalIP() : # get local IP address
 	global localIP
 	try : localIP = subprocess.check_output('ifconfig wlan0 | grep "inet " | cut -d " " -f 10-11', shell=True).decode()[:-2]
 	except subprocess.CalledProcessError : localIP = 'unknown'
 
-    blynk.virtual_write(9, localIP)
-	threading.Timer(1800, updateLocalIP).start()
+    blynk.virtual_write(6, publicIP + localIP)
+	threading.Timer(3600, updateIP).start()
 
 def updateServerUptime() : # get server uptime
 	global upTime
 	upTime = subprocess.check_output('uptime -p | cut -d " " -f2- | sed "s/hours/hrs/; s/minutes/min/; s/,//"', shell=True).decode()[:-1]
 
-    blynk.virtual_write(9, upTime)
+    blynk.virtual_write(7, upTime)
 	threading.Timer(60, updateServerUptime).start()
 
 def updateServerTime() : # get system time
 	global nowTime
 	nowTime = subprocess.check_output('date "+%F %T.%N" | rev | cut -c 7- | rev', shell=True).decode()[:-1]
 
-    blynk.virtual_write(9, nowTime)
+    blynk.virtual_write(8, nowTime)
 	threading.Timer(1, updateServerTime).start()
 
 '''
@@ -51,7 +47,7 @@ def transmit() : # transmit to ESP
 '''
 
 updateCPUTemp()
-updatePublicIP()
+updateIP()
 updateLocalIP()
 updateServerUptime()
 updateServerTime()
