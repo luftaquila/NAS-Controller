@@ -6,51 +6,32 @@
 
 #define ADC  A0
 #define FAN  14
-#define HDD  15
-#define COM  16
+#define COM  15
 
-#define SCREEN_WIDTH    128
-#define SCREEN_HEIGHT   64
+const char auth[] = "64vBgqBMh3kK7eEPWFgMblKib7sNwqLk";
+const char ssid[] = "LUFT-AQUILA";
+const char pass[] = "rokaFWIf512#";
 
-Adafruit_SSD1306 OLED(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
-
-const char auth[] = "YOUR_AUTH_TOKEN";
-const char ssid[] = "YOUR_SSID";
-const char pass[] = "YOUR_PASSWORD";
+int isOnline;
+bool SVR = true;
+bool COM_STAT = false;
+bool FAN_STAT = false;
 
 BlynkTimer timer;
 
-WidgetLED LED1(V3);
-WidgetLED LED2(V4);
+WidgetLED PWR(V3);
+WidgetLED ACT(V4);
 
-bool status = false;
-bool autoFan = false;
-bool isNew = true;
-
-int isOnline;
-int HDD_STAT = false;
-int COM_STAT = false;
-int FAN_STAT = false;
-
-char rcvData[130];
-char cputemp[50] = "00.0";
-char localIP[50]  = "Starting";
-char publicIP[50] = "Device";
-char upTime[50]  = "0sec";
-char nowTime[50] = "1999-05-12 00:00:00.0";
-
-float svrVolt;
+Adafruit_SSD1306 OLED(128, 64, &Wire, -1);
 
 void setup() {
   pinMode(FAN, OUTPUT);
-  pinMode(HDD, OUTPUT);
   pinMode(COM, OUTPUT);
 
-  Serial.begin(9600);
   Blynk.begin(auth, ssid, pass);
   OLED.begin(SSD1306_SWITCHCAPVCC, 0x3C);
 
-  delay(500);
+  delay(300);
   OLED.clearDisplay();
   OLED.setTextSize(1);
   OLED.setTextColor(WHITE, BLACK);
@@ -58,28 +39,20 @@ void setup() {
   initOLED();
   OLED.display();
 
-  timer.setInterval(500, updater);
-  timer.setInterval(60000, rstOLED);
+  timer.setInterval(500, voltageUpdater);
+  timer.setInterval(1000, blynkSync);
+  timer.setTimeout(60000, resetOLED);
   isOnline = timer.setTimeout(3000, serverNotAvailable);
 }
 
 void loop() {
   Blynk.run();
   timer.run();
-  receiver();
 }
 
-BLYNK_WRITE(V0) { // HDD Control
-  HDD_STAT = param.asInt();
-  OLED.setCursor(30, 9);
-  if(HDD_STAT) { digitalWrite(HDD, HIGH); OLED.print("O"); }
-  else         { digitalWrite(HDD, LOW ); OLED.print("X"); }
-  OLED.display();
-}
-
-BLYNK_WRITE(V1) { // Main Control
+BLYNK_WRITE(V0) { // COM Control
   COM_STAT = param.asInt();
-  OLED.setCursor(72, 9);
+  OLED.setCursor(30, 9);
   if(COM_STAT) { digitalWrite(COM, HIGH); OLED.print("O"); }
   else         { digitalWrite(COM, LOW ); OLED.print("X"); }
   OLED.display();
@@ -89,75 +62,75 @@ BLYNK_WRITE(V2) { // FAN Control
   FAN_STAT = param.asInt();
   OLED.setCursor(114, 9);
   if(FAN_STAT) { digitalWrite(FAN, HIGH); OLED.print("O"); }
-  else if(autoFan) Blynk.virtualWrite(V2, HIGH);
-  else { digitalWrite(FAN, LOW ); OLED.print("X"); }
+  else         { digitalWrite(FAN, LOW ); OLED.print("X"); }
+  OLED.display();
+}
+
+BLYNK_WRITE(V6) { // IP
+  char input[100];
+  strcpy(input, param.asStr());
+  char *ptr = strtok(input, " : ");
+  int num = 1;
+  while(ptr) {
+    if     (num == 1) {
+      String publicIP(ptr);
+      OLED.setCursor(33, 19);
+      OLED.print(publicIP);
+      OLED.display();
+    }
+    else if(num == 2) {
+      String localIP(ptr);
+      localIP.remove(0, 2);
+      OLED.setCursor(33, 30);
+      OLED.print(localIP);
+      OLED.display();
+    }
+    ptr = strtok(NULL, "");
+    num++;
+  }
+}
+
+BLYNK_WRITE(V7) { // Uptime
+  OLED.setCursor(22, 42);
+  OLED.print(param.asStr());
+  OLED.display();
+}
+
+BLYNK_WRITE(V8) { // Server active Signal
+  String input = param.asStr();
+  static String prev = String("SERVER OFF");
+  if(input != "SERVER OFF") input.remove(21, 2);
+  if(!input.equals(prev)) {
+    if(timer.isEnabled(isOnline)) timer.restartTimer(isOnline);
+    SVR = true;
+    ACT.on();
+    OLED.setCursor(0, 52);
+    OLED.print(input);
+    OLED.display();
+  }
+  else if(SVR && !timer.isEnabled(isOnline)) isOnline = timer.setTimeout(3000, serverNotAvailable);
+  prev = input;
+}
+
+BLYNK_WRITE(V9) { // CPU Temp
+  String cpuTemp = param.asStr();
+  OLED.setCursor(91, 0);
+  if(cpuTemp == "N/A") OLED.print(cpuTemp);
+  else OLED.print(cpuTemp.substring(0, 4) + "'C");
   OLED.display();
 }
 
 BLYNK_CONNECTED() { Blynk.syncAll(); }
 
-void updater() {
+void voltageUpdater() {
   // Voltage Divider : 98.2kΩ, 19.57kΩ   divide ratio : 0.166
-  float serverVoltage = svrVolt = float(analogRead(ADC)) / 1023.0 / 0.166;
-  float temp = String(cputemp).toFloat();
-
-  if(serverVoltage > 4.6) LED1.on();  else LED1.off();
-  if(status)            LED2.on();  else LED2.off();
+  float serverVoltage = float(analogRead(ADC)) / 1023.0 / 0.166;
   Blynk.virtualWrite(V5, String(serverVoltage, 3) + "V");
-  Blynk.virtualWrite(V6, String(publicIP) + " : " + String(localIP));
-  Blynk.virtualWrite(V7, upTime);
-  Blynk.virtualWrite(V8, nowTime);
-  Blynk.virtualWrite(V9, String(cputemp) + "°C");
-
-  if(temp > 60.0 && !FAN_STAT) {
-    autoFan = true;
-    FAN_STAT = HIGH;
-    Blynk.virtualWrite(V2, HIGH);
-    digitalWrite(FAN, HIGH);
-    OLED.setCursor(114, 9);
-    OLED.print("O");
-    OLED.display();
-  }
-  else if(temp < 60.0 && FAN_STAT && autoFan) {
-    autoFan = false;
-    FAN_STAT = LOW;
-    Blynk.virtualWrite(V2, LOW);
-    digitalWrite(FAN, LOW);
-    OLED.setCursor(114, 9);
-    OLED.print("X");
-    OLED.display();
-  }
-  updateOLED(serverVoltage);
-}
-
-void receiver() {
-  if(Serial.available()) {
-    if(timer.isEnabled(isOnline)) timer.restartTimer(isOnline);
-
-    Serial.readStringUntil('|').toCharArray(rcvData, 150);
-    if(isNew) { isNew = !isNew; return; }
-
-    byte count = 0;
-    bool isValid = false;
-    char *p = strtok(rcvData, "/");
-    while(p) {
-      if (!count) {
-        if(!strcmp(p, "+")) status = true;
-        else return;
-      }
-      else if(count == 1) strcpy(cputemp,  p);
-      else if(count == 2) strcpy(publicIP, p);
-      else if(count == 3) strcpy(localIP,  p);
-      else if(count == 4) strcpy(upTime,   p);
-      else if(count == 5) {
-        if(strcmp(nowTime, p)) strcpy(nowTime,  p);
-        else serverNotAvailable();
-      }
-      p = strtok(NULL, "/");
-      count++;
-    }
-  }
-  else if(!timer.isEnabled(isOnline)) isOnline = timer.setTimeout(3000, serverNotAvailable);
+  if(serverVoltage > 4.6) PWR.on();  else PWR.off();
+  OLED.setCursor(24, 0);
+  OLED.print(serverVoltage, 3);
+  OLED.print("V");
+  OLED.display();
 }
 
 void initOLED() {
@@ -166,8 +139,6 @@ void initOLED() {
   OLED.setCursor(67, 0);
   OLED.print("CPU:");
   OLED.setCursor(6, 9);
-  OLED.print("HDD:");
-  OLED.setCursor(48, 9);
   OLED.print("COM:");
   OLED.setCursor(90, 9);
   OLED.print("FAN:");
@@ -178,49 +149,37 @@ void initOLED() {
   OLED.setCursor(0, 42);
   OLED.print("UP:");
   OLED.setCursor(30, 9);
-  OLED.print(HDD_STAT ? "O" : "X");
-  OLED.setCursor(72, 9);
   OLED.print(COM_STAT ? "O" : "X");
   OLED.setCursor(114, 9);
   OLED.print(FAN_STAT ? "O" : "X");
 }
 
-void updateOLED(float serverVoltage) {
-  OLED.setCursor(24, 0);
-  OLED.print(serverVoltage, 3);
-  OLED.print("V");
+void serverNotAvailable() {
+  ACT.off();
+  SVR = false;
+  Blynk.virtualWrite(V9, "N/A");
+  Blynk.virtualWrite(V8, "SERVER OFF");
+  Blynk.virtualWrite(V7, "N/A");
+  Blynk.virtualWrite(V6, "N/A : N/A");
+
   OLED.setCursor(91, 0);
-  OLED.print(cputemp);
-  if(strcmp(cputemp, "N/A   ")) OLED.print("'C");
+  OLED.print("N/A   ");
   OLED.setCursor(33, 19);
-  OLED.print(publicIP);
+  OLED.print("N/A           ");
   OLED.setCursor(33, 30);
-  OLED.print(localIP);
+  OLED.print("N/A           ");
   OLED.setCursor(22, 42);
-  OLED.print(upTime);
-
-  String str = String(nowTime);
-  str.remove(21, 2);
+  OLED.print("N/A                 ");
   OLED.setCursor(0, 52);
-  OLED.print(str);
-
+  OLED.print("SERVER OFF            ");
   OLED.display();
 }
 
-void rstOLED() {
+void resetOLED() {
   OLED.clearDisplay();
   initOLED();
-  updateOLED(svrVolt);
+  timer.restartTimer(isOnline);
+  Blynk.syncAll();
 }
 
-void serverNotAvailable() {
-  isNew = true;
-  status = false;
-  strcpy(cputemp,  "N/A   ");
-  strcpy(publicIP, "N/A           ");
-  strcpy(localIP,  "N/A           ");
-  strcpy(upTime,   "N/A                 ");
-  strcpy(nowTime,  "SERVER OFF            ");
-  OLED.display();
-  while(Serial.available()) Serial.read();
-}
+void blynkSync() { Blynk.syncAll(); }
